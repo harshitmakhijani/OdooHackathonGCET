@@ -5,41 +5,100 @@
 {% block content %}
 <div class="container" style="margin-top: 2rem;">
     <div class="page-header">
-        <h1>Payroll Management</h1>
-        <a href="{{ url_for('admin.create_payroll') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Create Payroll</a>
+        <h1><i class="fas fa-money-check-alt"></i> Payroll Management</h1>
+        <a href="{{ url_for('admin.create_payroll') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create Payroll
+        </a>
     </div>
 
-    <div class="card">
+    <!-- Filter Card -->
+    <div class="card" style="margin-bottom: 2rem;">
         <div class="card-body">
-            <form method="GET" class="row" style="margin-bottom: 2rem;">
+            <form method="GET" class="row align-items-end">
                 <div class="col-md-3">
+                    <label>Month</label>
                     <select name="month" class="form-control">
                         {% for m in range(1, 13) %}
-                        <option value="{{ m }}" {% if request.args.get('month', date.today().month)|int == m %}selected{% endif %}>
+                        <option value="{{ m }}" {% if selected_month == m %}selected{% endif %}>
                             {{ ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m-1] }}
                         </option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-3">
+                    <label>Year</label>
                     <select name="year" class="form-control">
-                        {% for y in range(date.today().year-2, date.today().year+2) %}
-                        <option value="{{ y }}" {% if request.args.get('year', date.today().year)|int == y %}selected{% endif %}>{{ y }}</option>
+                        {% for y in years %}
+                        <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filter</button>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Filter
+                    </button>
                 </div>
             </form>
+        </div>
+    </div>
 
+    <!-- Summary Stats -->
+    <div class="row" style="margin-bottom: 2rem;">
+        {% set total_gross = payroll_records.items|map(attribute='gross_salary')|sum %}
+        {% set total_net = payroll_records.items|map(attribute='net_salary')|sum %}
+        {% set total_deductions = payroll_records.items|map(attribute='total_deductions')|sum %}
+        
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #4CAF50;">
+                    <i class="fas fa-wallet"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>₹{{ "{:,.2f}".format(total_gross) }}</h3>
+                    <p>Total Gross Salary</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #f44336;">
+                    <i class="fas fa-minus-circle"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>₹{{ "{:,.2f}".format(total_deductions) }}</h3>
+                    <p>Total Deductions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #2196F3;">
+                    <i class="fas fa-hand-holding-usd"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>₹{{ "{:,.2f}".format(total_net) }}</h3>
+                    <p>Total Net Salary</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payroll Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Payroll Records - {{ ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selected_month-1] }} {{ selected_year }}</h3>
+        </div>
+        <div class="card-body">
+            {% if payroll_records.items %}
             <div class="table-responsive">
                 <table class="table">
                     <thead>
                         <tr>
                             <th>Employee</th>
+                            <th>Department</th>
                             <th>Basic Salary</th>
                             <th>Allowances</th>
+                            <th>Gross Salary</th>
                             <th>Deductions</th>
                             <th>Net Salary</th>
                             <th>Status</th>
@@ -47,29 +106,129 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for payroll in payrolls.items %}
+                        {% for payroll in payroll_records.items %}
                         <tr>
-                            <td>{{ payroll.employee.full_name }}</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div class="avatar">{{ payroll.employee.first_name[0] }}{{ payroll.employee.last_name[0] }}</div>
+                                    <div>
+                                        <strong>{{ payroll.employee.full_name }}</strong><br>
+                                        <small class="text-muted">{{ payroll.employee.user.employee_id }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ payroll.employee.department }}</td>
                             <td>₹{{ "{:,.2f}".format(payroll.basic_salary) }}</td>
-                            <td>₹{{ "{:,.2f}".format(payroll.allowances) }}</td>
-                            <td>₹{{ "{:,.2f}".format(payroll.deductions) }}</td>
-                            <td><strong>₹{{ "{:,.2f}".format(payroll.net_salary) }}</strong></td>
+                            <td>₹{{ "{:,.2f}".format(payroll.total_allowances) }}</td>
+                            <td><strong>₹{{ "{:,.2f}".format(payroll.gross_salary) }}</strong></td>
+                            <td class="text-danger">₹{{ "{:,.2f}".format(payroll.total_deductions) }}</td>
+                            <td><strong class="text-success">₹{{ "{:,.2f}".format(payroll.net_salary) }}</strong></td>
                             <td>
                                 <span class="badge badge-{{ 'success' if payroll.status == 'Processed' else 'warning' }}">
                                     {{ payroll.status }}
                                 </span>
                             </td>
                             <td>
-                                <a href="{{ url_for('admin.edit_payroll', payroll_id=payroll.id) }}" class="btn btn-sm btn-primary">
+                                <a href="{{ url_for('admin.edit_payroll', payroll_id=payroll.id) }}" 
+                                   class="btn btn-sm btn-primary" 
+                                   title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </a>
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot>
+                        <tr style="background: var(--bg-light); font-weight: 600;">
+                            <td colspan="2">TOTAL</td>
+                            <td>₹{{ "{:,.2f}".format(payroll_records.items|map(attribute='basic_salary')|sum) }}</td>
+                            <td>₹{{ "{:,.2f}".format(payroll_records.items|map(attribute='total_allowances')|sum) }}</td>
+                            <td>₹{{ "{:,.2f}".format(total_gross) }}</td>
+                            <td class="text-danger">₹{{ "{:,.2f}".format(total_deductions) }}</td>
+                            <td class="text-success">₹{{ "{:,.2f}".format(total_net) }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
+
+            <!-- Pagination -->
+            {% if payroll_records.pages > 1 %}
+            <div class="pagination-wrapper">
+                <nav>
+                    <ul class="pagination">
+                        {% if payroll_records.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.payroll', page=payroll_records.prev_num, month=selected_month, year=selected_year) }}">Previous</a>
+                        </li>
+                        {% endif %}
+
+                        {% for page_num in payroll_records.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                            {% if page_num %}
+                                <li class="page-item {{ 'active' if page_num == payroll_records.page }}">
+                                    <a class="page-link" href="{{ url_for('admin.payroll', page=page_num, month=selected_month, year=selected_year) }}">{{ page_num }}</a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled"><span class="page-link">...</span></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if payroll_records.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.payroll', page=payroll_records.next_num, month=selected_month, year=selected_year) }}">Next</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-file-invoice-dollar fa-4x"></i>
+                <h3>No Payroll Records Found</h3>
+                <p>No payroll has been processed for this period.</p>
+                <a href="{{ url_for('admin.create_payroll') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Payroll
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
+
+<style>
+.avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-state i {
+    color: var(--text-secondary);
+    opacity: 0.3;
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+}
+</style>
 {% endblock %}

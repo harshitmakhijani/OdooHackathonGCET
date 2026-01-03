@@ -68,7 +68,10 @@
             <h3 class="card-title">Quick Actions</h3>
         </div>
         <div class="card-body" style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a href="{{ url_for('admin.mark_attendance') }}" class="btn btn-primary">📋 Mark Attendance</a>
+            <a href="{{ url_for('admin.hr_attendance') }}" class="btn btn-primary" style="font-weight: 600;">
+                <i class="fas fa-clipboard-check"></i> HR Attendance Panel
+            </a>
+            <a href="{{ url_for('admin.mark_attendance') }}" class="btn btn-outline-primary">📋 Quick Mark</a>
             <a href="{{ url_for('admin.leave_requests') }}" class="btn btn-warning">📅 Review Leaves</a>
             <a href="{{ url_for('admin.create_payroll') }}" class="btn btn-success">💰 Create Payroll</a>
             <a href="{{ url_for('admin.employees') }}" class="btn btn-outline">👥 Manage Employees</a>

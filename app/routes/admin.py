@@ -235,6 +235,127 @@ def attendance():
                          attendance_records=attendance_records,
                          filter_date=date_str)
 
+@bp.route('/hr-attendance', methods=['GET'])
+@admin_required
+def hr_attendance():
+    """HR Attendance management page"""
+    selected_date_str = request.args.get('date', date.today().strftime('%Y-%m-%d'))
+    selected_department = request.args.get('department', '')
+    
+    try:
+        selected_date = datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+    except:
+        selected_date = date.today()
+        selected_date_str = selected_date.strftime('%Y-%m-%d')
+    
+    # Get all active employees
+    query = Employee.query.filter_by(status='Active')
+    if selected_department:
+        query = query.filter_by(department=selected_department)
+    
+    employees = query.order_by(Employee.first_name).all()
+    
+    # Get existing attendance for the selected date
+    existing_records = Attendance.query.filter_by(date=selected_date).all()
+    existing_attendance = {record.employee_id: record for record in existing_records}
+    
+    # Get all departments
+    departments = db.session.query(Employee.department).filter_by(status='Active').distinct().order_by(Employee.department).all()
+    departments = [dept[0] for dept in departments if dept[0]]
+    
+    selected_date_formatted = selected_date.strftime('%A, %d %B %Y')
+    
+    return render_template('admin/hr_attendance.html',
+                         employees=employees,
+                         selected_date=selected_date_str,
+                         selected_date_formatted=selected_date_formatted,
+                         selected_department=selected_department,
+                         departments=departments,
+                         existing_attendance=existing_attendance)
+
+@bp.route('/hr-attendance/save', methods=['POST'])
+@admin_required
+def save_hr_attendance():
+    """Save attendance data from HR attendance page"""
+    try:
+        data = request.get_json()
+        attendance_date_str = data.get('date')
+        attendance_list = data.get('attendance', [])
+        
+        if not attendance_date_str or not attendance_list:
+            return jsonify({'success': False, 'message': 'Invalid data provided'}), 400
+        
+        attendance_date = datetime.strptime(attendance_date_str, '%Y-%m-%d').date()
+        saved_count = 0
+        updated_count = 0
+        
+        for item in attendance_list:
+            employee_id = item.get('employee_id')
+            status = item.get('status')
+            check_in_str = item.get('check_in')
+            check_out_str = item.get('check_out')
+            remarks = item.get('remarks', '').strip()
+            
+            # Check if attendance already exists
+            existing = Attendance.query.filter_by(
+                employee_id=employee_id,
+                date=attendance_date
+            ).first()
+            
+            if existing:
+                # Update existing record
+                existing.status = status
+                existing.remarks = remarks
+                if check_in_str and status not in ['Absent', 'Leave']:
+                    existing.check_in = datetime.strptime(check_in_str, '%H:%M').time()
+                else:
+                    existing.check_in = None
+                    
+                if check_out_str and status not in ['Absent', 'Leave']:
+                    existing.check_out = datetime.strptime(check_out_str, '%H:%M').time()
+                else:
+                    existing.check_out = None
+                    
+                existing.updated_at = datetime.utcnow()
+                updated_count += 1
+            else:
+                # Create new record
+                attendance = Attendance(
+                    employee_id=employee_id,
+                    date=attendance_date,
+                    status=status,
+                    remarks=remarks
+                )
+                
+                if check_in_str and status not in ['Absent', 'Leave']:
+                    attendance.check_in = datetime.strptime(check_in_str, '%H:%M').time()
+                    
+                if check_out_str and status not in ['Absent', 'Leave']:
+                    attendance.check_out = datetime.strptime(check_out_str, '%H:%M').time()
+                
+                db.session.add(attendance)
+                saved_count += 1
+        
+        db.session.commit()
+        
+        message = f'Attendance saved successfully! {saved_count} new records created'
+        if updated_count > 0:
+            message += f', {updated_count} records updated'
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'saved': saved_count,
+            'updated': updated_count
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error saving attendance: {str(e)}'
+        }), 500
+
 @bp.route('/attendance/mark', methods=['GET', 'POST'])
 @admin_required
 def mark_attendance():

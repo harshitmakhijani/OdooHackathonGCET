@@ -5,56 +5,150 @@
 {% block content %}
 <div class="container" style="margin-top: 2rem; max-width: 900px;">
     <div class="page-header">
-        <h1>Mark Attendance</h1>
-        <a href="{{ url_for('admin.attendance') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+        <h1><i class="fas fa-user-check"></i> Mark Attendance</h1>
+        <a href="{{ url_for('admin.attendance') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
     </div>
 
     <div class="card">
         <div class="card-body">
             <form method="POST">
-                <div class="form-group">
-                    <label>Date *</label>
-                    <input type="date" name="date" class="form-control" value="{{ date.today().strftime('%Y-%m-%d') }}" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Employee *</label>
-                    <select name="employee_id" class="form-control" required>
-                        <option value="">Select Employee</option>
-                        {% for emp in employees %}
-                        <option value="{{ emp.id }}">{{ emp.full_name }} ({{ emp.user.employee_id }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Status *</label>
-                    <select name="status" class="form-control" required>
-                        <option value="Present">Present</option>
-                        <option value="Absent">Absent</option>
-                        <option value="Half-day">Half Day</option>
-                        <option value="Leave">On Leave</option>
-                    </select>
-                </div>
-
                 <div class="row">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Check In Time</label>
-                            <input type="time" name="check_in" class="form-control">
+                            <label><i class="fas fa-calendar"></i> Date *</label>
+                            <input type="date" name="date" class="form-control" 
+                                   value="{{ date.today().strftime('%Y-%m-%d') }}" required>
+                            <small class="text-muted">Select the attendance date</small>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label>Check Out Time</label>
-                            <input type="time" name="check_out" class="form-control">
+                            <label><i class="fas fa-info-circle"></i> Status *</label>
+                            <select name="status" id="status" class="form-control" required onchange="toggleTimeFields()">
+                                <option value="Present">Present</option>
+                                <option value="Absent">Absent</option>
+                                <option value="Half-day">Half Day</option>
+                                <option value="Leave">On Leave</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Attendance</button>
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Employee *</label>
+                    <select name="employee_id" class="form-control" required>
+                        <option value="">-- Select Employee --</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.id }}">
+                            {{ emp.full_name }} ({{ emp.user.employee_id }}) - {{ emp.department }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Choose the employee for attendance marking</small>
+                </div>
+
+                <div id="timeFields">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><i class="fas fa-sign-in-alt"></i> Check In Time</label>
+                                <input type="time" name="check_in" class="form-control" value="09:00">
+                                <small class="text-muted">Optional - Leave empty if not applicable</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label><i class="fas fa-sign-out-alt"></i> Check Out Time</label>
+                                <input type="time" name="check_out" class="form-control" value="17:00">
+                                <small class="text-muted">Optional - Leave empty if not applicable</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-comment"></i> Remarks</label>
+                    <textarea name="remarks" class="form-control" rows="3" 
+                              placeholder="Add any additional notes or remarks..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Attendance
+                    </button>
+                    <a href="{{ url_for('admin.attendance') }}" class="btn btn-outline-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Attendance Section -->
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <h3 class="card-title" style="margin: 0;">
+                <i class="fas fa-users-cog"></i> Bulk Attendance Marking
+            </h3>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Mark attendance for all employees at once for a specific date</p>
+            <form method="POST" action="{{ url_for('admin.mark_bulk_attendance') }}">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Date *</label>
+                            <input type="date" name="date" class="form-control" 
+                                   value="{{ date.today().strftime('%Y-%m-%d') }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Default Status *</label>
+                            <select name="status" class="form-control" required>
+                                <option value="Present">Mark All Present</option>
+                                <option value="Absent">Mark All Absent</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Department</label>
+                            <select name="department" class="form-control">
+                                <option value="">All Departments</option>
+                                {% for dept in ['IT', 'HR', 'Finance', 'Operations', 'Sales', 'Marketing', 'Support', 'Management'] %}
+                                <option value="{{ dept }}">{{ dept }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success" 
+                        onclick="return confirm('Are you sure you want to mark attendance for multiple employees?')">
+                    <i class="fas fa-check-double"></i> Mark Bulk Attendance
+                </button>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+function toggleTimeFields() {
+    const status = document.getElementById('status').value;
+    const timeFields = document.getElementById('timeFields');
+    
+    if (status === 'Absent' || status === 'Leave') {
+        timeFields.style.display = 'none';
+        document.querySelector('input[name="check_in"]').value = '';
+        document.querySelector('input[name="check_out"]').value = '';
+    } else {
+        timeFields.style.display = 'block';
+    }
+}
+
+// Call on page load
+toggleTimeFields();
+</script>
 {% endblock %}

@@ -288,6 +288,109 @@ def mark_attendance():
                          employees=employees,
                          attendance_statuses=current_app.config['ATTENDANCE_STATUS'])
 
+@bp.route('/attendance/<int:id>/edit', methods=['GET', 'POST'])
+@admin_required
+def edit_attendance(id):
+    """Edit attendance record"""
+    attendance = Attendance.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        date_str = request.form.get('date')
+        status = request.form.get('status')
+        check_in_str = request.form.get('check_in')
+        check_out_str = request.form.get('check_out')
+        remarks = request.form.get('remarks', '').strip()
+        
+        try:
+            attendance.date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            attendance.status = status
+            attendance.remarks = remarks
+            
+            # Handle check in/out times
+            if check_in_str:
+                attendance.check_in = datetime.strptime(check_in_str, '%H:%M').time()
+            else:
+                attendance.check_in = None
+                
+            if check_out_str:
+                attendance.check_out = datetime.strptime(check_out_str, '%H:%M').time()
+            else:
+                attendance.check_out = None
+            
+            attendance.updated_at = datetime.utcnow()
+            db.session.commit()
+            
+            flash('Attendance updated successfully', 'success')
+            return redirect(url_for('admin.attendance'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Failed to update attendance: {str(e)}', 'error')
+    
+    return render_template('admin/edit_attendance.html', attendance=attendance)
+
+@bp.route('/attendance/<int:id>/delete', methods=['POST'])
+@admin_required
+def delete_attendance(id):
+    """Delete attendance record"""
+    attendance = Attendance.query.get_or_404(id)
+    
+    try:
+        db.session.delete(attendance)
+        db.session.commit()
+        flash('Attendance record deleted successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Failed to delete attendance: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.attendance'))
+
+@bp.route('/attendance/bulk', methods=['POST'])
+@admin_required
+def mark_bulk_attendance():
+    """Mark attendance for multiple employees at once"""
+    date_str = request.form.get('date')
+    status = request.form.get('status', 'Present')
+    department = request.form.get('department', '').strip()
+    
+    try:
+        attendance_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        
+        # Get employees based on department filter
+        query = Employee.query.filter_by(status='Active')
+        if department:
+            query = query.filter_by(department=department)
+        
+        employees = query.all()
+        marked_count = 0
+        
+        for employee in employees:
+            # Check if attendance already exists
+            existing = Attendance.query.filter_by(
+                employee_id=employee.id,
+                date=attendance_date
+            ).first()
+            
+            if not existing:
+                attendance = Attendance(
+                    employee_id=employee.id,
+                    date=attendance_date,
+                    status=status,
+                    remarks=f'Bulk attendance marked by admin'
+                )
+                if status == 'Present':
+                    attendance.check_in = datetime.strptime('09:00', '%H:%M').time()
+                    attendance.check_out = datetime.strptime('17:00', '%H:%M').time()
+                db.session.add(attendance)
+                marked_count += 1
+        
+        db.session.commit()
+        flash(f'Attendance marked for {marked_count} employees', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Failed to mark bulk attendance: {str(e)}', 'error')
+    
+    return redirect(url_for('admin.mark_attendance'))
+
 @bp.route('/leave-requests')
 @admin_required
 def leave_requests():

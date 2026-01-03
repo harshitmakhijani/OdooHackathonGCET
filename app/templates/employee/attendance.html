@@ -3,29 +3,130 @@
 {% block title %}My Attendance - Dayflow HRMS{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="container">
-        <h1 class="page-title">My Attendance ⏰</h1>
-        <p class="page-subtitle">Track your attendance records</p>
+<div class="container" style="margin-top: 2rem;">
+    <div class="page-header">
+        <h1><i class="fas fa-clock"></i> My Attendance</h1>
+        <div style="display: flex; gap: 1rem;">
+            <button type="button" class="btn btn-success" onclick="exportToCSV()">
+                <i class="fas fa-download"></i> Export CSV
+            </button>
+        </div>
     </div>
-</div>
 
-<div class="container">
+    <!-- Today's Attendance Quick Action -->
+    {% set today = date.today() %}
+    {% set today_attendance = attendance_records.items|selectattr('date', 'equalto', today)|first %}
+    
+    <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div class="card-body" style="padding: 2rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2rem;">
+                <div>
+                    <h3 style="margin: 0 0 0.5rem 0;">Today's Status</h3>
+                    <p style="margin: 0; opacity: 0.9; font-size: 18px;">
+                        {{ today.strftime('%A, %d %B %Y') }}
+                    </p>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    {% if today_attendance %}
+                        <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 8px;">
+                            <div style="font-size: 14px; opacity: 0.9;">Check In</div>
+                            <div style="font-size: 24px; font-weight: 700;">
+                                {{ today_attendance.check_in.strftime('%I:%M %p') if today_attendance.check_in else '-' }}
+                            </div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 8px;">
+                            <div style="font-size: 14px; opacity: 0.9;">Check Out</div>
+                            <div style="font-size: 24px; font-weight: 700;">
+                                {{ today_attendance.check_out.strftime('%I:%M %p') if today_attendance.check_out else 'Not yet' }}
+                            </div>
+                        </div>
+                        {% if today_attendance.check_in and today_attendance.check_out %}
+                        <div style="text-align: center; padding: 1rem; background: rgba(255,255,255,0.2); border-radius: 8px;">
+                            <div style="font-size: 14px; opacity: 0.9;">Hours Worked</div>
+                            <div style="font-size: 24px; font-weight: 700;">
+                                {{ today_attendance.hours_worked or '0h' }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if not today_attendance.check_out %}
+                        <form method="POST" action="{{ url_for('employee.checkout') }}" style="margin: 0;">
+                            <button type="submit" class="btn" style="background: white; color: var(--primary); font-weight: 600;">
+                                <i class="fas fa-sign-out-alt"></i> Check Out
+                            </button>
+                        </form>
+                        {% endif %}
+                    {% else %}
+                        <form method="POST" action="{{ url_for('employee.checkin') }}" style="margin: 0;">
+                            <button type="submit" class="btn" style="background: white; color: var(--primary); font-size: 18px; padding: 1rem 2rem; font-weight: 600;">
+                                <i class="fas fa-sign-in-alt"></i> Check In Now
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monthly Statistics -->
+    {% set current_month = date.today().month %}
+    {% set current_year = date.today().year %}
+    {% set monthly_records = attendance_records.items|selectattr('date')|select('match', current_month, current_year)|list %}
+    
+    <div class="row" style="margin-bottom: 2rem;">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-content">
+                    <h3>{{ attendance_records.items|selectattr('status', 'equalto', 'Present')|list|length }}</h3>
+                    <p>Present Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon danger"><i class="fas fa-times-circle"></i></div>
+                <div class="stat-content">
+                    <h3>{{ attendance_records.items|selectattr('status', 'equalto', 'Absent')|list|length }}</h3>
+                    <p>Absent Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon warning"><i class="fas fa-clock"></i></div>
+                <div class="stat-content">
+                    <h3>{{ attendance_records.items|selectattr('status', 'equalto', 'Half-day')|list|length }}</h3>
+                    <p>Half Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon info"><i class="fas fa-calendar-times"></i></div>
+                <div class="stat-content">
+                    <h3>{{ attendance_records.items|selectattr('status', 'equalto', 'Leave')|list|length }}</h3>
+                    <p>On Leave</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Attendance Records -->
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">Attendance History</h3>
         </div>
-        <div class="card-body">
+        <div class="card-body" style="padding: 0;">
             {% if attendance_records.items %}
             <div class="table-responsive">
-                <table class="table">
+                <table class="table" id="attendanceTable">
                     <thead>
                         <tr>
                             <th>Date</th>
                             <th>Day</th>
                             <th>Check In</th>
                             <th>Check Out</th>
+                            <th>Hours</th>
                             <th>Status</th>
                             <th>Remarks</th>
                         </tr>
@@ -33,16 +134,47 @@
                     <tbody>
                         {% for attendance in attendance_records.items %}
                         <tr>
-                            <td><strong>{{ attendance.date.strftime('%d %b %Y') }}</strong></td>
+                            <td>
+                                <strong>{{ attendance.date.strftime('%d %b %Y') }}</strong>
+                            </td>
                             <td>{{ attendance.date.strftime('%A') }}</td>
-                            <td>{{ attendance.check_in.strftime('%I:%M %p') if attendance.check_in else '-' }}</td>
-                            <td>{{ attendance.check_out.strftime('%I:%M %p') if attendance.check_out else '-' }}</td>
+                            <td>
+                                {% if attendance.check_in %}
+                                <span class="badge badge-success" style="font-size: 13px;">
+                                    <i class="fas fa-sign-in-alt"></i> {{ attendance.check_in.strftime('%I:%M %p') }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if attendance.check_out %}
+                                <span class="badge badge-danger" style="font-size: 13px;">
+                                    <i class="fas fa-sign-out-alt"></i> {{ attendance.check_out.strftime('%I:%M %p') }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if attendance.hours_worked %}
+                                <strong>{{ attendance.hours_worked }}</strong>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="badge badge-{{ 'success' if attendance.status == 'Present' else 'danger' if attendance.status == 'Absent' else 'warning' if attendance.status == 'Half-day' else 'info' }}">
                                     {{ attendance.status }}
                                 </span>
                             </td>
-                            <td>{{ attendance.remarks or '-' }}</td>
+                            <td>
+                                {% if attendance.remarks %}
+                                <small class="text-muted">{{ attendance.remarks }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -51,27 +183,66 @@
             
             <!-- Pagination -->
             {% if attendance_records.pages > 1 %}
-            <div class="pagination">
-                {% if attendance_records.has_prev %}
-                <a href="{{ url_for('employee.attendance', page=attendance_records.prev_num) }}" class="page-link">Previous</a>
-                {% endif %}
-                
-                {% for page in attendance_records.iter_pages() %}
-                    {% if page %}
-                    <a href="{{ url_for('employee.attendance', page=page) }}" 
-                       class="page-link {{ 'active' if page == attendance_records.page else '' }}">{{ page }}</a>
+            <div style="padding: 1.5rem; border-top: 1px solid var(--border-color);">
+                <div class="pagination">
+                    {% if attendance_records.has_prev %}
+                    <a href="{{ url_for('employee.attendance', page=attendance_records.prev_num) }}" class="page-link">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </a>
                     {% endif %}
-                {% endfor %}
-                
-                {% if attendance_records.has_next %}
-                <a href="{{ url_for('employee.attendance', page=attendance_records.next_num) }}" class="page-link">Next</a>
-                {% endif %}
+                    
+                    {% for page in attendance_records.iter_pages() %}
+                        {% if page %}
+                        <a href="{{ url_for('employee.attendance', page=page) }}" 
+                           class="page-link {{ 'active' if page == attendance_records.page else '' }}">{{ page }}</a>
+                        {% else %}
+                        <span class="page-link disabled">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if attendance_records.has_next %}
+                    <a href="{{ url_for('employee.attendance', page=attendance_records.next_num) }}" class="page-link">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
             {% else %}
-            <p class="text-center text-muted">No attendance records found.</p>
+            <div class="empty-state">
+                <i class="fas fa-clock"></i>
+                <h3>No Attendance Records</h3>
+                <p>You haven't marked any attendance yet. Check in to start tracking.</p>
+            </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+function exportToCSV() {
+    const table = document.getElementById('attendanceTable');
+    const rows = table.querySelectorAll('tr');
+    let csv = [];
+    
+    rows.forEach((row, index) => {
+        const cols = row.querySelectorAll('td, th');
+        let rowData = [];
+        cols.forEach(col => {
+            let text = col.innerText.replace(/\n/g, ' ').replace(/"/g, '""');
+            rowData.push('"' + text + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'my_attendance_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
 {% endblock %}

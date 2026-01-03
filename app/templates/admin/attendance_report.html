@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Report - Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+    <div class="page-header">
+        <h1><i class="fas fa-chart-bar"></i> Attendance Report</h1>
+        <a href="{{ url_for('admin.reports') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Reports
+        </a>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-body">
+            <form method="GET" style="display: flex; gap: 1rem; align-items: end;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label><i class="fas fa-calendar"></i> Month</label>
+                    <select name="month" class="form-control">
+                        {% for m in months %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>
+                            {{ ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label>Year</label>
+                    <select name="year" class="form-control">
+                        {% for y in years %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Generate Report
+                </button>
+                <button type="button" class="btn btn-success" onclick="exportToCSV()">
+                    <i class="fas fa-download"></i> Export CSV
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row" style="margin-bottom: 2rem;">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon primary"><i class="fas fa-users"></i></div>
+                <div class="stat-content">
+                    <h3>{{ report_data|length }}</h3>
+                    <p>Total Employees</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon success"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-content">
+                    <h3>{{ report_data|sum(attribute='present') }}</h3>
+                    <p>Total Present Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon danger"><i class="fas fa-times-circle"></i></div>
+                <div class="stat-content">
+                    <h3>{{ report_data|sum(attribute='absent') }}</h3>
+                    <p>Total Absent Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon warning"><i class="fas fa-calendar-times"></i></div>
+                <div class="stat-content">
+                    <h3>{{ report_data|sum(attribute='leave') }}</h3>
+                    <p>Total Leave Days</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                Attendance Details - {{ ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][month-1] }} {{ year }}
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if report_data %}
+            <div class="table-responsive">
+                <table class="table" id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Department</th>
+                            <th class="text-center">Present</th>
+                            <th class="text-center">Absent</th>
+                            <th class="text-center">Half Day</th>
+                            <th class="text-center">Leave</th>
+                            <th class="text-center">Total Days</th>
+                            <th class="text-center">Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for data in report_data %}
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div class="avatar" style="width: 36px; height: 36px; font-size: 14px;">
+                                        {{ data.employee.first_name[0] }}{{ data.employee.last_name[0] }}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600;">{{ data.employee.full_name }}</div>
+                                        <small class="text-muted">{{ data.employee.user.employee_id }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ data.employee.department }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-success">{{ data.present }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-danger">{{ data.absent }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-warning">{{ data.half_day }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-info">{{ data.leave }}</span>
+                            </td>
+                            <td class="text-center">
+                                <strong>{{ data.total }}</strong>
+                            </td>
+                            <td class="text-center">
+                                {% set attendance_pct = ((data.present + data.half_day * 0.5) / data.total * 100) if data.total > 0 else 0 %}
+                                <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: center;">
+                                    <div class="progress" style="width: 80px; height: 8px; margin: 0;">
+                                        <div class="progress-bar {% if attendance_pct >= 90 %}bg-success{% elif attendance_pct >= 75 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             style="width: {{ attendance_pct }}%"></div>
+                                    </div>
+                                    <span style="font-weight: 600; {% if attendance_pct >= 90 %}color: var(--success);{% elif attendance_pct >= 75 %}color: var(--warning);{% else %}color: var(--danger);{% endif %}">
+                                        {{ "%.1f"|format(attendance_pct) }}%
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: var(--bg-light); font-weight: 600;">
+                            <td colspan="2">Total</td>
+                            <td class="text-center">{{ report_data|sum(attribute='present') }}</td>
+                            <td class="text-center">{{ report_data|sum(attribute='absent') }}</td>
+                            <td class="text-center">{{ report_data|sum(attribute='half_day') }}</td>
+                            <td class="text-center">{{ report_data|sum(attribute='leave') }}</td>
+                            <td class="text-center">{{ report_data|sum(attribute='total') }}</td>
+                            <td class="text-center">-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-chart-bar"></i>
+                <h3>No Attendance Records</h3>
+                <p>No attendance data available for the selected period.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function exportToCSV() {
+    const table = document.getElementById('attendanceTable');
+    const rows = table.querySelectorAll('tr');
+    let csv = [];
+    
+    rows.forEach((row, index) => {
+        const cols = row.querySelectorAll('td, th');
+        let rowData = [];
+        cols.forEach(col => {
+            // Get text content and clean it
+            let text = col.innerText.replace(/\n/g, ' ').replace(/"/g, '""');
+            rowData.push('"' + text + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    
+    // Create download
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'attendance_report_{{ month }}_{{ year }}.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+
+<style>
+.progress {
+    background: var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+.badge {
+    min-width: 40px;
+    padding: 0.4rem 0.6rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

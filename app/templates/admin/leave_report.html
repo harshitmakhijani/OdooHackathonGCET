@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Leave Report - Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+    <div class="page-header">
+        <h1><i class="fas fa-calendar-alt"></i> Leave Report</h1>
+        <a href="{{ url_for('admin.reports') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Reports
+        </a>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-body">
+            <form method="GET" style="display: flex; gap: 1rem; align-items: end;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label><i class="fas fa-calendar"></i> Year</label>
+                    <select name="year" class="form-control">
+                        {% for y in years %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Generate Report
+                </button>
+                <button type="button" class="btn btn-success" onclick="exportToCSV()">
+                    <i class="fas fa-download"></i> Export CSV
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row" style="margin-bottom: 2rem;">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon primary"><i class="fas fa-users"></i></div>
+                <div class="stat-content">
+                    <h3>{{ leave_stats|length }}</h3>
+                    <p>Total Employees</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon success"><i class="fas fa-check"></i></div>
+                <div class="stat-content">
+                    <h3>{{ leave_stats|sum(attribute='2')|int }}</h3>
+                    <p>Total Approved Days</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon danger"><i class="fas fa-times"></i></div>
+                <div class="stat-content">
+                    <h3>{{ leave_stats|sum(attribute='3')|int }}</h3>
+                    <p>Total Rejected</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon warning"><i class="fas fa-clock"></i></div>
+                <div class="stat-content">
+                    <h3>{{ leave_stats|sum(attribute='4')|int }}</h3>
+                    <p>Pending Requests</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Leave Details - Year {{ year }}</h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if leave_stats %}
+            <div class="table-responsive">
+                <table class="table" id="leaveTable">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Department</th>
+                            <th class="text-center">Total Requests</th>
+                            <th class="text-center">Approved Days</th>
+                            <th class="text-center">Rejected</th>
+                            <th class="text-center">Pending</th>
+                            <th class="text-center">Utilization</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for employee, total_req, approved_days, rejected, pending in leave_stats %}
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div class="avatar" style="width: 36px; height: 36px; font-size: 14px;">
+                                        {{ employee.first_name[0] }}{{ employee.last_name[0] }}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600;">{{ employee.full_name }}</div>
+                                        <small class="text-muted">{{ employee.user.employee_id }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ employee.department }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-primary">{{ total_req or 0 }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-success">{{ approved_days or 0 }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-danger">{{ rejected or 0 }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-warning">{{ pending or 0 }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% set leave_limit = 20 %}
+                                {% set utilized = ((approved_days or 0) / leave_limit * 100) %}
+                                <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: center;">
+                                    <div class="progress" style="width: 100px; height: 8px; margin: 0;">
+                                        <div class="progress-bar {% if utilized >= 80 %}bg-danger{% elif utilized >= 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                             style="width: {{ utilized }}%"></div>
+                                    </div>
+                                    <span style="font-weight: 600;">
+                                        {{ approved_days or 0 }}/{{ leave_limit }}
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: var(--bg-light); font-weight: 600;">
+                            <td colspan="2">Total</td>
+                            <td class="text-center">{{ leave_stats|sum(attribute='1')|int }}</td>
+                            <td class="text-center">{{ leave_stats|sum(attribute='2')|int }}</td>
+                            <td class="text-center">{{ leave_stats|sum(attribute='3')|int }}</td>
+                            <td class="text-center">{{ leave_stats|sum(attribute='4')|int }}</td>
+                            <td class="text-center">-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-calendar-alt"></i>
+                <h3>No Leave Records</h3>
+                <p>No leave data available for the selected year.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function exportToCSV() {
+    const table = document.getElementById('leaveTable');
+    const rows = table.querySelectorAll('tr');
+    let csv = [];
+    
+    rows.forEach((row, index) => {
+        const cols = row.querySelectorAll('td, th');
+        let rowData = [];
+        cols.forEach((col, colIndex) => {
+            // Skip the last column (Utilization with progress bar)
+            if (colIndex < cols.length - 1 || row.parentElement.tagName === 'THEAD') {
+                let text = col.innerText.replace(/\n/g, ' ').replace(/"/g, '""');
+                rowData.push('"' + text + '"');
+            }
+        });
+        csv.push(rowData.join(','));
+    });
+    
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'leave_report_{{ year }}.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+
+<style>
+.progress {
+    background: var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+.badge {
+    min-width: 40px;
+    padding: 0.4rem 0.6rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Payroll Report - Admin{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+    <div class="page-header">
+        <h1><i class="fas fa-money-bill-wave"></i> Payroll Report</h1>
+        <a href="{{ url_for('admin.reports') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Reports
+        </a>
+    </div>
+
+    <!-- Filter Card -->
+    <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-body">
+            <form method="GET" style="display: flex; gap: 1rem; align-items: end;">
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label><i class="fas fa-calendar"></i> Month</label>
+                    <select name="month" class="form-control">
+                        {% for m in months %}
+                        <option value="{{ m }}" {% if m == month %}selected{% endif %}>
+                            {{ ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <label>Year</label>
+                    <select name="year" class="form-control">
+                        {% for y in years %}
+                        <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter"></i> Generate Report
+                </button>
+                <button type="button" class="btn btn-success" onclick="exportToCSV()">
+                    <i class="fas fa-download"></i> Export CSV
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="row" style="margin-bottom: 2rem;">
+        <div class="col-md-4">
+            <div class="stat-card" style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="font-size: 48px; opacity: 0.8;">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <div>
+                        <h5 style="margin: 0; opacity: 0.9; font-size: 14px;">Total Gross Salary</h5>
+                        <h2 style="margin: 0.5rem 0 0 0;">₹{{ "{:,.2f}".format(total_gross) }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%); color: white;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="font-size: 48px; opacity: 0.8;">
+                        <i class="fas fa-minus-circle"></i>
+                    </div>
+                    <div>
+                        <h5 style="margin: 0; opacity: 0.9; font-size: 14px;">Total Deductions</h5>
+                        <h2 style="margin: 0.5rem 0 0 0;">₹{{ "{:,.2f}".format(total_deductions) }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card" style="background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white;">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="font-size: 48px; opacity: 0.8;">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                    <div>
+                        <h5 style="margin: 0; opacity: 0.9; font-size: 14px;">Total Net Salary</h5>
+                        <h2 style="margin: 0.5rem 0 0 0;">₹{{ "{:,.2f}".format(total_net) }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                Payroll Details - {{ ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][month-1] }} {{ year }}
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if payroll_data %}
+            <div class="table-responsive">
+                <table class="table" id="payrollTable">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Department</th>
+                            <th class="text-right">Basic Salary</th>
+                            <th class="text-right">Allowances</th>
+                            <th class="text-right">Gross Salary</th>
+                            <th class="text-right">Deductions</th>
+                            <th class="text-right">Net Salary</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payroll, employee in payroll_data %}
+                        <tr>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div class="avatar" style="width: 36px; height: 36px; font-size: 14px;">
+                                        {{ employee.first_name[0] }}{{ employee.last_name[0] }}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: 600;">{{ employee.full_name }}</div>
+                                        <small class="text-muted">{{ employee.user.employee_id }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ employee.department }}</td>
+                            <td class="text-right">₹{{ "{:,.2f}".format(payroll.basic_salary) }}</td>
+                            <td class="text-right">
+                                <span style="color: var(--success);">
+                                    +₹{{ "{:,.2f}".format(payroll.total_allowances) }}
+                                </span>
+                            </td>
+                            <td class="text-right">
+                                <strong>₹{{ "{:,.2f}".format(payroll.gross_salary) }}</strong>
+                            </td>
+                            <td class="text-right">
+                                <span style="color: var(--danger);">
+                                    -₹{{ "{:,.2f}".format(payroll.total_deductions) }}
+                                </span>
+                            </td>
+                            <td class="text-right">
+                                <strong style="color: var(--primary); font-size: 16px;">
+                                    ₹{{ "{:,.2f}".format(payroll.net_salary) }}
+                                </strong>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-success">{{ payroll.status }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: var(--bg-light); font-weight: 700; font-size: 16px;">
+                            <td colspan="2">Grand Total</td>
+                            <td class="text-right">₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.basic_salary')) }}</td>
+                            <td class="text-right" style="color: var(--success);">
+                                +₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.total_allowances')) }}
+                            </td>
+                            <td class="text-right">₹{{ "{:,.2f}".format(total_gross) }}</td>
+                            <td class="text-right" style="color: var(--danger);">
+                                -₹{{ "{:,.2f}".format(total_deductions) }}
+                            </td>
+                            <td class="text-right" style="color: var(--primary);">
+                                ₹{{ "{:,.2f}".format(total_net) }}
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Additional Breakdown -->
+            <div style="padding: 2rem; background: var(--bg-light); margin-top: 1rem;">
+                <h4 style="margin-bottom: 1.5rem;">Detailed Breakdown</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h5 style="color: var(--success); margin-bottom: 1rem;">
+                                <i class="fas fa-plus-circle"></i> Allowances Breakdown
+                            </h5>
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>HRA:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.hra')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>DA:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.da')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>TA:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.ta')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Medical:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.medical_allowance')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Other:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.other_allowances')) }}</strong></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <h5 style="color: var(--danger); margin-bottom: 1rem;">
+                                <i class="fas fa-minus-circle"></i> Deductions Breakdown
+                            </h5>
+                            <table style="width: 100%;">
+                                <tr>
+                                    <td>PF:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.pf')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Tax (TDS):</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.tax')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Insurance:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.insurance')) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td>Other:</td>
+                                    <td class="text-right"><strong>₹{{ "{:,.2f}".format(payroll_data|sum(attribute='0.other_deductions')) }}</strong></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-money-bill-wave"></i>
+                <h3>No Payroll Records</h3>
+                <p>No payroll data available for the selected period.</p>
+                <a href="{{ url_for('admin.create_payroll') }}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Payroll
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function exportToCSV() {
+    const table = document.getElementById('payrollTable');
+    const rows = table.querySelectorAll('tbody tr');
+    let csv = ['Employee ID,Employee Name,Department,Basic Salary,Allowances,Gross Salary,Deductions,Net Salary,Status'];
+    
+    rows.forEach(row => {
+        const cols = row.querySelectorAll('td');
+        const empId = cols[0].querySelector('.text-muted').innerText;
+        const empName = cols[0].querySelector('div > div').innerText;
+        const dept = cols[1].innerText;
+        const basic = cols[2].innerText.replace('₹', '').replace(/,/g, '');
+        const allowances = cols[3].innerText.replace('+₹', '').replace(/,/g, '');
+        const gross = cols[4].innerText.replace('₹', '').replace(/,/g, '');
+        const deductions = cols[5].innerText.replace('-₹', '').replace(/,/g, '');
+        const net = cols[6].innerText.replace('₹', '').replace(/,/g, '');
+        const status = cols[7].innerText;
+        
+        csv.push(`"${empId}","${empName}","${dept}",${basic},${allowances},${gross},${deductions},${net},"${status}"`);
+    });
+    
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'payroll_report_{{ month }}_{{ year }}.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+
+<style>
+.text-right {
+    text-align: right !important;
+}
+
+.stat-card {
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+}
+
+.badge {
+    min-width: 80px;
+    padding: 0.4rem 0.8rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
